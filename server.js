@@ -38,6 +38,24 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/api/ffmpeg-check", (req, res) => {
+  const { execFile } = require("child_process");
+
+  execFile("ffmpeg", ["-version"], (error, stdout) => {
+    if (error) {
+      return res.status(500).json({
+        installed: false,
+        message: "FFmpeg is not installed or not available."
+      });
+    }
+
+    res.json({
+      installed: true,
+      version: stdout.split("\n")[0]
+    });
+  });
+});
+
 function validateUrl(value) {
   let url;
 
