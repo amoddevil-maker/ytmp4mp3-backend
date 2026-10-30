@@ -269,6 +269,76 @@ function runFfmpeg(inputPath, outputPath, format) {
   });
 }
 
+app.post("/api/upload-convert", (req, res) => {
+  upload.single("media")(req, res, async (uploadError) => {
+    let jobDir;
+
+    try {
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "Please upload an audio or video file."
+        });
+      }
+
+      const format = req.body.format;
+
+      if (!["mp3", "mp4"].includes(format)) {
+        fs.rmSync(req.file.path, { force: true });
+
+        return res.status(400).json({
+          success: false,
+          error: "Choose MP3 or MP4."
+        });
+      }
+
+      const id = crypto.randomUUID();
+      jobDir = path.join(workRoot, id);
+      fs.mkdirSync(jobDir, { recursive: true });
+
+      const inputPath = path.join(jobDir, "input.media");
+      const outputPath = path.join(jobDir, `converted.${format}`);
+
+      fs.renameSync(req.file.path, inputPath);
+
+      await runFfmpeg(inputPath, outputPath, format);
+
+      fs.rmSync(inputPath, { force: true });
+
+      jobs.set(id, {
+        path: outputPath,
+        format,
+        expires: Date.now() + FILE_TTL_MS
+      });
+
+      return res.json({
+        success: true,
+        format,
+        downloadUrl: `/api/download/${id}`,
+        expiresInSeconds: FILE_TTL_MS / 1000
+      });
+
+    } catch (error) {
+      if (req.file?.path) {
+        fs.rmSync(req.file.path, { force: true });
+      }
+
+      if (jobDir) {
+        fs.rmSync(jobDir, { recursive: true, force: true });
+      }
+
+      return res.status(400).json({
+        success: false,
+        error: error.message || "Upload conversion failed."
+      });
+    }
+  });
+});
+
 app.post("/api/convert", async (req, res) => {
   let jobDir;
 
