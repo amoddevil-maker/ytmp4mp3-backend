@@ -34,6 +34,36 @@ const workRoot = path.join(os.tmpdir(), "media-converter");
 
 fs.mkdirSync(workRoot, { recursive: true });
 
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, callback) => {
+    callback(null, workRoot);
+  },
+  filename: (req, file, callback) => {
+    callback(null, `upload-${crypto.randomUUID()}`);
+  }
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: {
+    fileSize: MAX_BYTES,
+    files: 1
+  },
+  fileFilter: (req, file, callback) => {
+    const type = (file.mimetype || "").toLowerCase();
+
+    if (
+      type.startsWith("audio/") ||
+      type.startsWith("video/") ||
+      type === "application/octet-stream"
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error("Please upload an audio or video file."));
+    }
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
