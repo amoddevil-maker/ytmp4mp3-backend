@@ -324,7 +324,23 @@ setInterval(() => {
     }
   }
 }, 60 * 1000).unref();
+const { execFile } = require("child_process");
 
+app.get("/api/ffmpeg-check", (req, res) => {
+  execFile("ffmpeg", ["-version"], (error, stdout) => {
+    if (error) {
+      return res.status(500).json({
+        status: "error",
+        message: "FFmpeg not found"
+      });
+    }
+
+    res.json({
+      status: "ok",
+      ffmpeg: stdout.split("\n")[0]
+    });
+  });
+});
 app.listen(PORT, () => {
   console.log(`Media conversion API listening on port ${PORT}`);
 });
