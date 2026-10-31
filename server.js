@@ -440,7 +440,81 @@ app.get("/api/ffmpeg-check", (req, res) => {
       ffmpeg: stdout.split("\n")[0]
     });
   });
+}); 
+app.get("/api/youtube-preview", async (req, res) => {
+  try {
+    const videoUrl = req.query.url;
+
+    if (typeof videoUrl !== "string" || videoUrl.length > 2048) {
+      return res.status(400).json({
+        success: false,
+        error: "Please enter a valid YouTube URL."
+      });
+    }
+
+    const parsedUrl = new URL(videoUrl);
+
+    const allowedDomains = [
+      "youtube.com",
+      "www.youtube.com",
+      "m.youtube.com",
+      "youtu.be"
+    ];
+
+    if (
+      parsedUrl.protocol !== "https:" ||
+      !allowedDomains.includes(parsedUrl.hostname.toLowerCase())
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Please enter a valid YouTube video URL."
+      });
+    }
+
+    const videoId = parsedUrl.hostname === "youtu.be"
+      ? parsedUrl.pathname.slice(1)
+      : parsedUrl.searchParams.get("v");
+
+    if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      return res.status(400).json({
+        success: false,
+        error: "YouTube video ID is invalid."
+      });
+    }
+
+    const officialUrl =
+      "https://www.youtube.com/watch?v=" + videoId;
+
+    const oembedUrl =
+      "https://www.youtube.com/oembed?url=" +
+      encodeURIComponent(officialUrl) +
+      "&format=json";
+
+    const response = await fetch(oembedUrl, {
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!response.ok) {
+      throw new Error("YouTube preview is unavailable for this video.");
+    }
+
+    const data = await response.json();
+
+    res.json({
+      success: true,
+      title: data.title,
+      author: data.author_name,
+      thumbnail: data.thumbnail_url
+    });
+
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message || "Could not load YouTube preview."
+    });
+  }
 });
+
 app.listen(PORT, () => {
   console.log(`Media conversion API listening on port ${PORT}`);
 });
